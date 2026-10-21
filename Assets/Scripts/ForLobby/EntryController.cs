@@ -88,13 +88,13 @@ public class EntryController : MonoBehaviour
 
     public void OnGameStartButtonClicked()
     {
-        string _ip = "18.142.220.61";
+        string _ip = ServerConfig.Current.ip;
         if (NetworkManager.StartConnectionWithIP(_ip) == 1)
         {
             _textMessage = "싱가포르 서버에 연결되었습니다";
             _chooseRole = true;
             ModelManager._whileConnected = true;
-            ModelManager._ip = "18.142.220.61";
+            ModelManager._ip = _ip;
         }
         else
         {

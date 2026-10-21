@@ -71,3 +71,7 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# 서버 접속 정보 (server_config.example.json 참고)
+/[Aa]ssets/StreamingAssets/server_config.json
+/[Aa]ssets/StreamingAssets/server_config.json.meta

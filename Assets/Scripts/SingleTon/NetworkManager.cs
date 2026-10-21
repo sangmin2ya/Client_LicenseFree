@@ -30,6 +30,11 @@ public class NetworkManager : MonoBehaviour
 
 	public static int StartConnectionWithIP(string ip)
     {
-        return _instance._networking.connect(ip, "12237", "CatgirlLover", "nekomimi");
+        ServerConfig config = ServerConfig.Current;
+        if (!config.IsValid)
+        {
+            return -1;
+        }
+        return _instance._networking.connect(ip, config.port, config.user, config.password);
     }
 }

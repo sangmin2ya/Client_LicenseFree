@@ -19,8 +19,6 @@ public class NetworkingController
 	public int connect(string ip, string port, string user, string password)
 	{
 		Debug.Log("Arg ip: " + ip);
-		Debug.Log("Arg user: " + user);
-		Debug.Log("Arg password: " + password);
 
 		if (websocket != null && websocket.IsAlive)
 		{
@@ -31,8 +29,9 @@ public class NetworkingController
 		Debug.Log("Creating websocket");
 		string serverAddress = "ws://" + ip + ":" + port;
 		websocket = new WebSocket(serverAddress + "/unitysocket");
+#if UNITY_EDITOR
 		websocket.Log.Level = LogLevel.Trace;
-		websocket.Log.File = "G:\\somelog";
+#endif
 
 		websocket.SetCredentials(user, password, false);
 
@@ -120,17 +119,6 @@ public class NetworkingController
 			websocket.Send(json);
 		}
 	}
-
-	/**
-	 * Helper method to just connect to the server manually
-	 */
-	/*
-	private void connectManually()
-	{
-		Debug.Log("Connecting Manually...");
-		connect("127.0.0.1", "12237", "CatgirlLover", "nekomimi");
-		Debug.Log("Finished Manual Connection.");
-	}*/
 
 	// TODO: can this be handled better?
 	private void EndAsyncEvent(IAsyncResult iar)
