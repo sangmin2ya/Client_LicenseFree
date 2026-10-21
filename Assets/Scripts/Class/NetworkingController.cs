@@ -13,6 +13,8 @@ public class NetworkingController
 	private WebSocket websocket = null;
 	private Dictionary<String, HashSet<EventHandler<MessageEventArgs>>> onMessageFunctions = new Dictionary<String, HashSet<EventHandler<MessageEventArgs>>>();
 	private readonly ConcurrentQueue<PendingMessage> pendingMessages = new ConcurrentQueue<PendingMessage>();
+	// 지금 처리 중인 메시지를 소켓 스레드에서 받은 시각(ms). 핸들러가 메인 스레드 지연 없이 수신 시각을 쓸 수 있게 한다
+	public long CurrentMessageReceivedAt { get; private set; }
 
 	public NetworkingController()
 	{
@@ -40,6 +42,7 @@ public class NetworkingController
 
 		websocket.OnMessage += (sender, e) =>
 		{
+			long receivedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 			var responseType = ServerResponse.CreateFromJSON(e.Data).type;
 			string pattern = "\"errMessage\":\"(.*?)\"";
 			Match match = Regex.Match(e.Data, pattern);
@@ -50,7 +53,7 @@ public class NetworkingController
 				Debug.Log(responseType);
 
 			// 소켓 스레드에서는 큐에 넣기만 하고, 핸들러는 메인 스레드에서 수신 순서대로 실행한다
-			pendingMessages.Enqueue(new PendingMessage { type = responseType, sender = sender, args = e });
+			pendingMessages.Enqueue(new PendingMessage { type = responseType, sender = sender, args = e, receivedAt = receivedAt });
 		};
 
 		websocket.OnOpen += (sender, e) =>
@@ -127,6 +130,7 @@ public class NetworkingController
 			{
 				continue;
 			}
+			CurrentMessageReceivedAt = message.receivedAt;
 			// 핸들러 안에서 구독/해제해도 순회가 깨지지 않도록 스냅샷으로 순회
 			foreach (EventHandler<MessageEventArgs> eventHandler in handlers.ToArray())
 			{
@@ -147,6 +151,7 @@ public class NetworkingController
 		public string type;
 		public object sender;
 		public MessageEventArgs args;
+		public long receivedAt;
 	}
 
 	public class ServerResponse
