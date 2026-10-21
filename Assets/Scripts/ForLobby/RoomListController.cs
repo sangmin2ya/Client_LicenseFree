@@ -22,6 +22,11 @@ public class RoomListController : MonoBehaviour
     private static readonly String _responseName = responseType.ROOM_LIST.ToString();
 
     // Start is called before the first frame update
+    void OnDestroy()
+    {
+        NetworkingController networking = NetworkManager.getNetworkingController();
+        networking.stopListenOnMessage(RoomListUpdated, _responseName);
+    }
     void Start()
     {
         NetworkingController networking = NetworkManager.getNetworkingController();

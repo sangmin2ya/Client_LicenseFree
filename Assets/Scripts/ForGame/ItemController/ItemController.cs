@@ -20,7 +20,7 @@ public class ItemController : MonoBehaviour
         NetworkingController networking = NetworkManager.getNetworkingController();
         networking.startListenOnMessage(ItemUpdated, _ResponseName);
     }
-    void Destroy()
+    void OnDestroy()
     {
         NetworkingController networking = NetworkManager.getNetworkingController();
         networking.stopListenOnMessage(ItemUpdated, _ResponseName);

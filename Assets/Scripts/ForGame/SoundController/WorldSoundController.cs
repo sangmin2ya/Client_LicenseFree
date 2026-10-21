@@ -16,10 +16,10 @@ public class WorldSoundController : MonoBehaviour
         NetworkingController networking = NetworkManager.getNetworkingController();
         networking.startListenOnMessage(MissionUpdated, _missionResponseName);
     }
-    void Destroy()
+    void OnDestroy()
     {
         NetworkingController networking = NetworkManager.getNetworkingController();
-        networking.startListenOnMessage(MissionUpdated, _missionResponseName);
+        networking.stopListenOnMessage(MissionUpdated, _missionResponseName);
     }
 
     // Update is called once per frame

@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using UnityEngine;
@@ -10,6 +12,7 @@ public class NetworkingController
 
 	private WebSocket websocket = null;
 	private Dictionary<String, HashSet<EventHandler<MessageEventArgs>>> onMessageFunctions = new Dictionary<String, HashSet<EventHandler<MessageEventArgs>>>();
+	private readonly ConcurrentQueue<PendingMessage> pendingMessages = new ConcurrentQueue<PendingMessage>();
 
 	public NetworkingController()
 	{
@@ -46,13 +49,8 @@ public class NetworkingController
 			else
 				Debug.Log(responseType);
 
-			if (onMessageFunctions.ContainsKey(responseType))
-			{
-				foreach (EventHandler<MessageEventArgs> eventHandler in onMessageFunctions[responseType])
-				{
-					eventHandler.BeginInvoke(sender, e, EndAsyncEvent, null);
-				}
-			}
+			// 소켓 스레드에서는 큐에 넣기만 하고, 핸들러는 메인 스레드에서 수신 순서대로 실행한다
+			pendingMessages.Enqueue(new PendingMessage { type = responseType, sender = sender, args = e });
 		};
 
 		websocket.OnOpen += (sender, e) =>
@@ -120,21 +118,35 @@ public class NetworkingController
 		}
 	}
 
-	// TODO: can this be handled better?
-	private void EndAsyncEvent(IAsyncResult iar)
+	// NetworkManager.Update에서 매 프레임 호출. 쌓인 메시지를 메인 스레드에서 동기 처리한다.
+	public void DispatchPendingMessages()
 	{
-		var ar = (System.Runtime.Remoting.Messaging.AsyncResult)iar;
-		var invokedMethod = (System.EventHandler<WebSocketSharp.MessageEventArgs>)(ar.AsyncDelegate);
+		while (pendingMessages.TryDequeue(out PendingMessage message))
+		{
+			if (message.type == null || !onMessageFunctions.TryGetValue(message.type, out var handlers))
+			{
+				continue;
+			}
+			// 핸들러 안에서 구독/해제해도 순회가 깨지지 않도록 스냅샷으로 순회
+			foreach (EventHandler<MessageEventArgs> eventHandler in handlers.ToArray())
+			{
+				try
+				{
+					eventHandler(message.sender, message.args);
+				}
+				catch (Exception ex)
+				{
+					Debug.LogException(ex);
+				}
+			}
+		}
+	}
 
-		try
-		{
-			invokedMethod.EndInvoke(iar);
-		}
-		catch
-		{
-			// Handle any exceptions that were thrown by the invoked method
-			Debug.Log("An event listener went kaboom!");
-		}
+	private struct PendingMessage
+	{
+		public string type;
+		public object sender;
+		public MessageEventArgs args;
 	}
 
 	public class ServerResponse

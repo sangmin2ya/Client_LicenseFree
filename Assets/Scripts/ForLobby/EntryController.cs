@@ -39,6 +39,11 @@ public class EntryController : MonoBehaviour
 
     private static readonly String _responseName = responseType.CREATE_ROOM.ToString();
 
+    void OnDestroy()
+    {
+        NetworkingController networking = NetworkManager.getNetworkingController();
+        networking.stopListenOnMessage(CreateRoomUpdated, _responseName);
+    }
     void Start()
     {
         Cursor.lockState = CursorLockMode.None;

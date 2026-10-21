@@ -19,6 +19,8 @@ public class ReconnectionController : MonoBehaviour
     private bool _endOnce = true;
     private bool _needToLoadScene = false;
     private static readonly string _reconnectResponseName = responseType.RECONNECT.ToString();
+    private const float MaxRetryDelay = 8f;
+    private int _retryCount = 0;
     void Awake()
     {
         if (_instance != null)
@@ -36,7 +38,7 @@ public class ReconnectionController : MonoBehaviour
         NetworkingController networking = NetworkManager.getNetworkingController();
         networking.startListenOnMessage(ReconnectUpdated, _reconnectResponseName);
     }
-    void Destroy()
+    void OnDestroy()
     {
         NetworkingController networking = NetworkManager.getNetworkingController();
         networking.stopListenOnMessage(ReconnectUpdated, _reconnectResponseName);
@@ -64,11 +66,15 @@ public class ReconnectionController : MonoBehaviour
             //모든 작동 정지
             ModelManager._isDisconnected = true;
             //재접속중 화면 on
-            _reconnectingCanvas = Instantiate(_reconnecting);
+            ShowReconnectingCanvas();
             //소켓에는 한번만 연결
             if (_connectOnce)
             {
-                ConnectServer();
+                if (!TryConnectOrRetry(() => ModelManager._isDisconnectedInGame = true))
+                {
+                    ModelManager._isDisconnectedInGame = false;
+                    return;
+                }
                 _connectOnce = false;
             }
             SendRequest();
@@ -79,7 +85,7 @@ public class ReconnectionController : MonoBehaviour
         if (ModelManager._isDisconnectedCloseGame)
         {
             ModelManager._isDisconnected = true;
-            _reconnectingCanvas = Instantiate(_reconnecting);
+            ShowReconnectingCanvas();
             SendRequest();
             ModelManager._isDisconnectedCloseGame = false;
             _needToLoadScene = true;
@@ -93,11 +99,15 @@ public class ReconnectionController : MonoBehaviour
                 //모든 작동 정지
                 ModelManager._isDisconnected = true;
                 //재접속중 화면 on
-                _reconnectingCanvas = Instantiate(_reconnecting);
+                ShowReconnectingCanvas();
                 //소켓에는 한번만 연결
                 if (_connectOnce)
                 {
-                    ConnectServer();
+                    if (!TryConnectOrRetry(() => ModelManager._isDisconnectedInLobby = true))
+                    {
+                        ModelManager._isDisconnectedInLobby = false;
+                        return;
+                    }
                     _connectOnce = false;
                 }
                 ModelManager._isDisconnectedInLobby = false;
@@ -107,10 +117,14 @@ public class ReconnectionController : MonoBehaviour
             else
             {
                 ModelManager._isDisconnected = true;
-                _reconnectingCanvas = Instantiate(_reconnecting);
+                ShowReconnectingCanvas();
                 if (_connectOnce)
                 {
-                    ConnectServer();
+                    if (!TryConnectOrRetry(() => ModelManager._isDisconnectedInLobby = true))
+                    {
+                        ModelManager._isDisconnectedInLobby = false;
+                        return;
+                    }
                     SendRequest();
                     _connectOnce = false;
                 }
@@ -134,9 +148,37 @@ public class ReconnectionController : MonoBehaviour
         }
     }
     //소켓 재연결
-    public void ConnectServer()
+    //이미 연결된 소켓이면 0을 반환하므로 성공으로 본다
+    public bool ConnectServer()
     {
-        while (NetworkManager.StartConnectionWithIP(ModelManager._ip) != 1) { };
+        return NetworkManager.StartConnectionWithIP(ModelManager._ip) >= 0;
+    }
+    //연결에 실패하면 재접속 화면을 유지한 채 1, 2, 4, 8초 간격으로 같은 끊김 처리를 다시 시도
+    private bool TryConnectOrRetry(Action raiseDisconnectAgain)
+    {
+        if (ConnectServer())
+        {
+            _retryCount = 0;
+            return true;
+        }
+        float delay = Mathf.Min(MaxRetryDelay, Mathf.Pow(2f, _retryCount));
+        _retryCount++;
+        Debug.LogWarning("재접속 실패, " + delay + "초 후 다시 시도");
+        StartCoroutine(RetryAfter(delay, raiseDisconnectAgain));
+        return false;
+    }
+    //재접속중 화면 on (재시도 대기 중에도 유지)
+    private void ShowReconnectingCanvas()
+    {
+        if (_reconnectingCanvas == null)
+        {
+            _reconnectingCanvas = Instantiate(_reconnecting);
+        }
+    }
+    IEnumerator RetryAfter(float delay, Action raiseDisconnectAgain)
+    {
+        yield return new WaitForSeconds(delay);
+        raiseDisconnectAgain();
     }
     public void ReplaceUser()
     {
